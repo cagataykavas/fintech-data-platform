@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "TransactionEvent",
+  "type": "object",
+  "required": ["event_id", "customer_id", "event_time", "amount", "currency", "merchant_id"],
+  "properties": {
+    "event_id": {"type": "string", "minLength": 8},
+    "customer_id": {"type": "string", "minLength": 1},
+    "event_time": {"type": "string", "format": "date-time"},
+    "amount": {"type": "number", "minimum": 0},
+    "currency": {"type": "string", "pattern": "^[A-Z]{3}$"},
+    "merchant_id": {"type": "string", "minLength": 1},
+    "country": {"type": "string", "pattern": "^[A-Z]{2}$"},
+    "channel": {"type": "string", "enum": ["card", "bank_transfer", "wallet", "atm"]}
+  },
+  "additionalProperties": false
+}
