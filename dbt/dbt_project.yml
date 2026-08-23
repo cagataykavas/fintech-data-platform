@@ -1,0 +1,14 @@
+name: fintech_data_platform
+version: '1.0.0'
+config-version: 2
+
+profile: fintech_data_platform
+model-paths: ["models"]
+clean-targets: ["target", "dbt_packages"]
+
+models:
+  fintech_data_platform:
+    staging:
+      +materialized: view
+    marts:
+      +materialized: table
