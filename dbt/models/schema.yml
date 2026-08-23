@@ -1,0 +1,26 @@
+version: 2
+
+models:
+  - name: stg_transactions
+    description: Contract-validated Silver transaction events exposed to analytics.
+    columns:
+      - name: event_id
+        tests: [not_null, unique]
+      - name: customer_id
+        tests: [not_null]
+      - name: event_time
+        tests: [not_null]
+      - name: amount
+        tests: [not_null]
+      - name: currency
+        tests: [not_null]
+
+  - name: fct_customer_daily_activity
+    description: Daily customer activity features suitable for monitoring, analytics and downstream ML.
+    columns:
+      - name: customer_id
+        tests: [not_null]
+      - name: event_date
+        tests: [not_null]
+      - name: transaction_count
+        tests: [not_null]
