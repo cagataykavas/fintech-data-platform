@@ -1,0 +1,7 @@
+fintech_data_platform:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: ../data/warehouse/dbt_fintech.duckdb
+      threads: 4
