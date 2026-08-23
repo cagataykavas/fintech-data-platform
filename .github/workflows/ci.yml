@@ -1,0 +1,30 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - run: ruff check src tests
+      - run: pytest -q
+      - name: Build synthetic lakehouse data
+        run: |
+          python -m src.generate_transactions --count 500 --output data/incoming/transactions.jsonl
+          python -m src.pipeline data/incoming/transactions.jsonl
+          python -m src.build_mart
+      - name: Run dbt build
+        run: |
+          mkdir -p .dbt
+          cp dbt/profiles.yml.example .dbt/profiles.yml
+          cd dbt
+          dbt build --profiles-dir ../.dbt
+      - run: docker compose config
