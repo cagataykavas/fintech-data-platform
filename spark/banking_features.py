@@ -7,7 +7,7 @@ from pyspark.sql.types import DoubleType, StringType, StructField, StructType, T
 
 TRANSACTION_SCHEMA = StructType(
     [
-        StructField("transaction_id", StringType(), False),
+        StructField("event_id", StringType(), False),
         StructField("customer_id", StringType(), False),
         StructField("merchant_id", StringType(), False),
         StructField("event_time", TimestampType(), False),
@@ -25,7 +25,7 @@ def read_transactions(spark: SparkSession, path: str) -> DataFrame:
         .option("mode", "FAILFAST")
         .parquet(path)
         .filter(F.col("amount") >= 0)
-        .dropDuplicates(["transaction_id"])
+        .dropDuplicates(["event_id"])
     )
 
 
@@ -48,7 +48,7 @@ def add_customer_velocity_features(df: DataFrame) -> DataFrame:
     previous_30d = ordered.rangeBetween(-30 * 24 * 3600, -1)
 
     return (
-        df.withColumn("txn_count_24h", F.count("transaction_id").over(previous_24h))
+        df.withColumn("txn_count_24h", F.count("event_id").over(previous_24h))
         .withColumn("amount_sum_24h", F.sum("amount").over(previous_24h))
         .withColumn("amount_avg_7d", F.avg("amount").over(previous_7d))
         .withColumn("amount_std_30d", F.stddev_pop("amount").over(previous_30d))
@@ -94,7 +94,7 @@ def build_feature_table(df: DataFrame) -> DataFrame:
     features = add_peer_features(features)
 
     selected = [
-        "transaction_id",
+        "event_id",
         "customer_id",
         "event_time",
         "amount",

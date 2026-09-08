@@ -32,7 +32,7 @@ A good interview answer distinguishes:
 
 ## Deduplication
 
-At-least-once delivery can produce duplicate records. The public example uses the stable `transaction_id` with `dropDuplicatesWithinWatermark` so duplicate state remains bounded by the watermark rather than growing forever.
+At-least-once delivery can produce duplicate records. The public example uses the stable `event_id` with `dropDuplicatesWithinWatermark` so duplicate state remains bounded by the watermark rather than growing forever.
 
 Exactly-once is a property of the **end-to-end pipeline**, not a magic Kafka checkbox. Source offsets, Spark checkpointing and sink behavior all matter.
 

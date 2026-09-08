@@ -52,6 +52,23 @@ Financial-data engineering has requirements that toy ETL examples often hide:
 - Spark shuffle/skew behavior at larger scale;
 - event time, late data, checkpointing and state in streaming systems.
 
+## Replay and identity contract
+
+Batch ingestion uses two identities deliberately:
+
+- the SHA-256 digest of the input bytes creates a deterministic `run_id`;
+- `event_id` is the business identity, while a canonical payload digest detects mutation.
+
+An SQLite ingestion ledger reserves business IDs before Silver publication and commits them only
+after partition files are atomically renamed. An exact file retry records a new attempt manifest
+but writes zero rows. A later overlapping batch writes only unseen IDs. Reusing an existing
+`event_id` with different content is recorded as a producer conflict and sent to quarantine rather
+than being silently accepted or mislabeled as a duplicate. Failed publication releases only that
+run's uncommitted reservations, enabling a safe retry.
+
+Each attempt produces `data/manifests/transactions/run=<digest>/attempt=<n>.json`. CI uploads these
+manifests with the built warehouse as inspectable evidence.
+
 ## Quick start — local batch path
 
 ```bash
@@ -88,7 +105,9 @@ The development stack includes an S3-compatible object store and PostgreSQL serv
 
 ### Contract
 
-`contracts/transaction.schema.json` defines the transaction event contract. `src/validate_event.py` uses JSON Schema and produces a stable SHA-256 idempotency key.
+`contracts/transaction.schema.json` defines the transaction event contract. `src/validate_event.py`
+uses JSON Schema and produces a canonical payload digest. Batch, dbt and Spark paths all use
+`event_id`; CI includes a local Spark regression test so schema drift between those paths fails.
 
 ### Bronze
 
@@ -222,4 +241,8 @@ A realistic platform needs reconciliation between these paths instead of pretend
 
 ## CI
 
-GitHub Actions validates the repository's Python quality/tests and exercises the deterministic batch path and data transformations. Streaming code remains a reference workload because a real Kafka/Spark integration environment is intentionally not pretended inside a tiny unit test.
+GitHub Actions lints the complete Python surface, exercises replay/conflict integration tests,
+builds the deterministic lakehouse and dbt marts, validates Compose, and uploads manifests plus
+the warehouse. A separate Java 17/PySpark job executes feature-window and streaming-validation
+tests locally. Kafka recovery remains a documented integration boundary rather than a mocked
+claim.

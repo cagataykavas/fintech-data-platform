@@ -15,7 +15,7 @@ Prefer columnar formats such as Parquet and select only required columns.
 ```python
 transactions = (
     spark.read.parquet(path)
-    .select("transaction_id", "customer_id", "event_time", "amount", "country")
+    .select("event_id", "customer_id", "event_time", "amount", "country")
     .filter(F.col("event_time") >= F.lit(cutoff))
 )
 ```
