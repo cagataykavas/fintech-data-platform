@@ -16,7 +16,7 @@ from pyspark.sql.types import (
 
 TRANSACTION_SCHEMA = StructType(
     [
-        StructField("transaction_id", StringType(), False),
+        StructField("event_id", StringType(), False),
         StructField("customer_id", StringType(), False),
         StructField("merchant_id", StringType(), False),
         StructField("event_time", TimestampType(), False),
@@ -55,7 +55,7 @@ def parse_kafka_events(raw: DataFrame) -> DataFrame:
 
 def validate_events(events: DataFrame) -> tuple[DataFrame, DataFrame]:
     valid_condition = (
-        F.col("transaction_id").isNotNull()
+        F.col("event_id").isNotNull()
         & F.col("customer_id").isNotNull()
         & F.col("event_time").isNotNull()
         & F.col("amount").isNotNull()
@@ -65,7 +65,7 @@ def validate_events(events: DataFrame) -> tuple[DataFrame, DataFrame]:
 
     enriched = events.withColumn(
         "validation_error",
-        F.when(F.col("transaction_id").isNull(), F.lit("missing_transaction_id"))
+        F.when(F.col("event_id").isNull(), F.lit("missing_event_id"))
         .when(F.col("customer_id").isNull(), F.lit("missing_customer_id"))
         .when(F.col("event_time").isNull(), F.lit("missing_event_time"))
         .when(F.col("amount").isNull(), F.lit("missing_amount"))
@@ -84,7 +84,7 @@ def add_stream_features(events: DataFrame, watermark: str) -> DataFrame:
     """
     deduplicated = (
         events.withWatermark("event_time", watermark)
-        .dropDuplicatesWithinWatermark(["transaction_id"])
+        .dropDuplicatesWithinWatermark(["event_id"])
         .withColumn("event_date", F.to_date("event_time"))
         .withColumn("event_hour", F.hour("event_time"))
         .withColumn("is_night", F.col("event_hour").between(0, 5).cast("int"))
@@ -98,7 +98,7 @@ def add_stream_features(events: DataFrame, watermark: str) -> DataFrame:
             "customer_id",
         )
         .agg(
-            F.count("transaction_id").alias("txn_count_5m"),
+            F.count("event_id").alias("txn_count_5m"),
             F.sum("amount").alias("amount_sum_5m"),
             F.max("amount").alias("amount_max_5m"),
             F.sum("is_cross_border").alias("cross_border_count_5m"),

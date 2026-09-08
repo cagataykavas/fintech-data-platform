@@ -14,7 +14,7 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install -r requirements.txt
-      - run: ruff check src tests
+      - run: ruff check .
       - run: pytest -q
       - name: Build synthetic lakehouse data
         run: |
@@ -28,3 +28,25 @@ jobs:
           cd dbt
           dbt build --profiles-dir ../.dbt
       - run: docker compose config
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: fintech-lakehouse-evidence
+          path: |
+            data/manifests/
+            data/warehouse/
+          if-no-files-found: error
+
+  spark:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - run: pip install -r requirements-spark.txt
+      - run: pytest -q tests/test_spark.py

@@ -15,7 +15,7 @@ CUSTOMER_SCHEMA = StructType(
 
 TRANSACTION_SCHEMA = StructType(
     [
-        StructField("transaction_id", StringType(), False),
+        StructField("event_id", StringType(), False),
         StructField("customer_id", StringType(), False),
         StructField("amount_cents", IntegerType(), False),
     ]
@@ -69,7 +69,7 @@ def salted_join(
         "salt",
         F.when(
             F.array_contains(hot_array, F.col("customer_id")),
-            F.pmod(F.xxhash64("transaction_id"), F.lit(salt_buckets)),
+            F.pmod(F.xxhash64("event_id"), F.lit(salt_buckets)),
         ).otherwise(F.lit(0)),
     )
 
@@ -89,7 +89,7 @@ def aggregate_without_python_udf(enriched: DataFrame) -> DataFrame:
         enriched.withColumn("amount", F.col("amount_cents") / F.lit(100.0))
         .groupBy("segment", "country")
         .agg(
-            F.count("transaction_id").alias("transaction_count"),
+            F.count("event_id").alias("transaction_count"),
             F.sum("amount").alias("gross_volume"),
             F.avg("amount").alias("average_ticket"),
             F.expr("percentile_approx(amount, 0.95)").alias("p95_ticket"),
