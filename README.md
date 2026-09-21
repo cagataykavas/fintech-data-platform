@@ -223,6 +223,34 @@ batch     -> complete history / backfill / training / reconciliation
 
 A realistic platform needs reconciliation between these paths instead of pretending a streaming system eliminates the need for reproducible historical data.
 
+### Batch/stream feature reconciliation gate
+
+`src/reconcile_features.py` turns that boundary into an executable release check. It compares
+customer/window feature snapshots from the streaming sink with a reproducible batch reference and
+reports missing windows, unexpected windows, transaction-count differences and amount-sum drift.
+Only windows older than a configurable maturation lag are judged, so normal watermark latency is
+reported as pending evidence instead of a false incident.
+
+```bash
+python -m src.reconcile_features \
+  --batch evidence/batch-features.json \
+  --stream evidence/stream-features.json \
+  --as-of 2026-09-21T12:00:00Z \
+  --min-reference-windows 100 \
+  --max-missing-rate 0.01
+```
+
+Inputs are JSON arrays with `customer_id`, timezone-aware `window_start`/`window_end`,
+`txn_count` and `amount_sum`. The command emits deterministic JSON and exits with status 2 when a
+configured evidence or drift budget fails. Duplicate keys, naive timestamps, negative counts,
+non-finite amounts and invalid policies fail closed rather than producing a misleading comparison.
+
+The check deliberately treats batch output as the reference and assumes both jobs use identical
+window boundaries and currency semantics. It does not prove event completeness upstream, replace
+checkpoint recovery tests or make approximate streaming features exact. Production rollout should
+persist reports, alert on repeated failures, segment policies by currency/traffic tier, and validate
+the batch reference independently.
+
 ## Cloud translation
 
 | Local / logical component | AWS | GCP | Azure |
