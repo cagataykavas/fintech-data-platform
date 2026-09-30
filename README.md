@@ -95,11 +95,20 @@ PY
 
 ```bash
 docker compose up -d
-python -m src.object_store --bucket fintech-lakehouse
+python -m src.object_store \
+  --bucket fintech-lakehouse \
+  --source-revision "git:$(git rev-parse HEAD)" \
+  --create-bucket
 python -m src.postgres_load
 ```
 
 The development stack includes an S3-compatible object store and PostgreSQL serving warehouse.
+
+Object-store publication uses content-addressed Parquet objects and writes a canonical manifest
+last as the snapshot commit marker. Retries reuse verified bytes instead of overwriting mutable
+keys, while partial uploads remain invisible to manifest-driven consumers. See
+[`docs/object_store_snapshots.md`](docs/object_store_snapshots.md) for the protocol, failure model
+and trust boundaries.
 
 ## Data layers
 
