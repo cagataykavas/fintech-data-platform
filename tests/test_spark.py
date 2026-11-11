@@ -8,7 +8,11 @@ pytest.importorskip("pyspark")
 from pyspark.sql import SparkSession
 
 from spark.banking_features import TRANSACTION_SCHEMA, build_feature_table
-from spark.structured_streaming import validate_events
+from spark.structured_streaming import (
+    StreamingConfig,
+    build_checkpoint_contract,
+    validate_events,
+)
 
 
 @pytest.fixture(scope="module")
@@ -67,3 +71,20 @@ def test_stream_validation_uses_the_canonical_event_id(spark: SparkSession) -> N
 
     assert valid.select("event_id").first()["event_id"] == "evt-00000001"
     assert invalid.select("validation_error").first()["validation_error"] == "negative_amount"
+
+
+def test_checkpoint_contract_tracks_stateful_stream_semantics() -> None:
+    config = StreamingConfig(
+        bootstrap_servers="kafka-b:9092,kafka-a:9092",
+        topic="transactions",
+        checkpoint_path="data/checkpoints/transaction-risk",
+        output_path="data/streaming/customer-risk-features",
+    )
+
+    contract = build_checkpoint_contract(config)
+
+    assert contract.query_name == "transaction_risk_features"
+    assert contract.watermark == "15 minutes"
+    assert contract.window_duration == "5 minutes"
+    assert contract.deduplication_keys == ("event_id",)
+    assert len(contract.event_schema_sha256) == 64

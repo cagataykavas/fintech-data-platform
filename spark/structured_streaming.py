@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 from dataclasses import dataclass
 
 from pyspark.sql import DataFrame, SparkSession
@@ -11,6 +12,12 @@ from pyspark.sql.types import (
     StructField,
     StructType,
     TimestampType,
+)
+
+from src.stream_checkpoint import (
+    CheckpointContractEvidence,
+    StreamCheckpointContract,
+    admit_local_checkpoint,
 )
 
 
@@ -26,6 +33,10 @@ TRANSACTION_SCHEMA = StructType(
         StructField("channel", StringType(), False),
     ]
 )
+
+QUERY_NAME = "transaction_risk_features"
+WINDOW_DURATION = "5 minutes"
+SLIDE_DURATION = "1 minute"
 
 
 @dataclass(frozen=True)
@@ -94,7 +105,7 @@ def add_stream_features(events: DataFrame, watermark: str) -> DataFrame:
 
     five_minute = (
         deduplicated.groupBy(
-            F.window("event_time", "5 minutes", "1 minute"),
+            F.window("event_time", WINDOW_DURATION, SLIDE_DURATION),
             "customer_id",
         )
         .agg(
@@ -131,9 +142,33 @@ def write_features(features: DataFrame, config: StreamingConfig):
         .option("checkpointLocation", config.checkpoint_path)
         .partitionBy("window_start")
         .trigger(processingTime=f"{config.trigger_seconds} seconds")
-        .queryName("transaction_risk_features")
+        .queryName(QUERY_NAME)
         .start()
     )
+
+
+def build_checkpoint_contract(config: StreamingConfig) -> StreamCheckpointContract:
+    """Describe the source, state and sink semantics tied to this checkpoint."""
+
+    return StreamCheckpointContract.build(
+        query_name=QUERY_NAME,
+        bootstrap_servers=config.bootstrap_servers,
+        topic=config.topic,
+        output_path=config.output_path,
+        event_schema=TRANSACTION_SCHEMA.jsonValue(),
+        starting_offsets="latest",
+        fail_on_data_loss=False,
+        watermark=config.watermark,
+        window_duration=WINDOW_DURATION,
+        slide_duration=SLIDE_DURATION,
+        deduplication_keys=("event_id",),
+        output_mode="append",
+        partition_keys=("window_start",),
+    )
+
+
+def admit_checkpoint(config: StreamingConfig) -> CheckpointContractEvidence:
+    return admit_local_checkpoint(config.checkpoint_path, build_checkpoint_contract(config))
 
 
 def build_session() -> SparkSession:
@@ -147,6 +182,8 @@ def build_session() -> SparkSession:
 
 
 def run(config: StreamingConfig) -> None:
+    checkpoint_evidence = admit_checkpoint(config)
+    print(json.dumps({"checkpoint_contract": checkpoint_evidence.as_dict()}, sort_keys=True))
     spark = build_session()
     raw = kafka_source(spark, config)
     events = parse_kafka_events(raw)

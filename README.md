@@ -191,7 +191,7 @@ The important concepts are not the buzzwords. The implementation/docs make expli
 - late-arriving data;
 - watermark/state-retention trade-offs;
 - bounded deduplication;
-- checkpoint recovery;
+- checkpoint recovery with a content-addressed state-semantics contract;
 - consumer lag/backpressure;
 - streaming quarantine;
 - why short-window streaming features and long-horizon historical features may use different state/storage strategies.
