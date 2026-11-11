@@ -52,6 +52,22 @@ Long-horizon 7d/30d customer features are better handled by a deliberately desig
 
 The checkpoint directory stores query progress and state metadata. Deleting it is not equivalent to restarting the same query: the application may replay or lose its previous progress depending on the source/sink configuration.
 
+Before Spark starts, the runnable stream now creates or reconciles a sibling
+`<checkpoint>.contract.json` file. The privacy-reduced contract binds the source
+cluster/topic identity, output location, event schema, starting-offset and
+data-loss behavior, watermark, window/slide sizes, deduplication keys, output
+mode and partition keys. Exact restarts match the existing SHA-256 identity;
+semantic drift fails closed and never overwrites the original evidence. Trigger
+frequency is intentionally excluded because changing it does not redefine the
+stored state.
+
+The included publisher uses an fsynced temporary file and an atomic hard-link
+create, so concurrent local starts have one creator. Remote checkpoint URIs
+fail closed: production object/HDFS storage needs an adapter with an equivalent
+create-if-absent precondition and strongly consistent read semantics. The
+contract proves configuration identity, not checkpoint health or sink
+exactly-once behavior.
+
 Operational rules:
 
 1. use a durable checkpoint location;
@@ -59,6 +75,7 @@ Operational rules:
 3. version incompatible state/schema changes deliberately;
 4. monitor checkpoint/state-store growth;
 5. test recovery from process termination.
+6. version the checkpoint deliberately when the contract rejects a semantic change.
 
 ## Late-data trade-off
 
